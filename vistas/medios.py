@@ -194,19 +194,31 @@ def render(datos: dict):
             .sort_values("costo", ascending=False)
         )
 
+        df_camp["costo"] = pd.to_numeric(df_camp["costo"], errors="coerce").fillna(0)
+        df_camp["impresiones"] = pd.to_numeric(df_camp["impresiones"], errors="coerce").fillna(0)
+        df_camp["clics"] = pd.to_numeric(df_camp["clics"], errors="coerce").fillna(0)
+        df_camp["conversiones"] = pd.to_numeric(df_camp["conversiones"], errors="coerce").fillna(0)
+
         df_camp["ctr"] = (
-            df_camp["clics"] / df_camp["impresiones"]
-        ).apply(lambda x: f"{x*100:.2f}%" if x > 0 else "—")
+            df_camp["clics"] / df_camp["impresiones"].replace(0, pd.NA)
+        ).apply(lambda x: f"{x*100:.2f}%" if pd.notna(x) and x > 0 else "—")
 
         df_camp["costo_fmt"] = df_camp["costo"].apply(ars)
-        df_camp["impresiones"] = df_camp["impresiones"].apply(num)
-        df_camp["clics"] = df_camp["clics"].apply(num)
-        df_camp["conversiones"] = df_camp["conversiones"].apply(num)
+        df_camp["impresiones_fmt"] = df_camp["impresiones"].apply(num)
+        df_camp["clics_fmt"] = df_camp["clics"].apply(num)
+        df_camp["conversiones_fmt"] = df_camp["conversiones"].apply(num)
 
         st.dataframe(
             df_camp[
-                ["plataforma", "campaña", "costo_fmt", "impresiones", "clics", "ctr", "conversiones"]
-            ].rename(columns={"costo_fmt": "costo"}),
+                ["plataforma", "campaña", "costo_fmt", "impresiones_fmt", "clics_fmt", "ctr", "conversiones_fmt"]
+            ].rename(
+                columns={
+                    "costo_fmt": "costo",
+                    "impresiones_fmt": "impresiones",
+                    "clics_fmt": "clics",
+                    "conversiones_fmt": "conversiones",
+                }
+            ),
             use_container_width=True,
             hide_index=True,
         )
