@@ -87,7 +87,17 @@ def render(datos: dict):
 
     with col_b:
         st.markdown("##### Mix del período")
-        if zing_mes + perf_mes > 0:
+        try:
+    zing_mes = float(zing_mes) if zing_mes else 0
+except:
+    zing_mes = 0
+
+try:
+    perf_mes = float(perf_mes) if perf_mes else 0
+except:
+    perf_mes = 0
+
+if (zing_mes + perf_mes) > 0:
             fig_pie = go.Figure(go.Pie(
                 labels=["Zinguería","Perfilería"],
                 values=[zing_mes, perf_mes],
