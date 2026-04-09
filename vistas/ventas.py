@@ -55,37 +55,7 @@ def render(datos: dict):
 
     col_a, col_b = st.columns([2,1])
 
-    with col_a:
-        st.markdown("##### Evolución mensual de ventas")
-        df_monthly = df_v.groupby("periodo").agg(
-            total=("total","sum"),
-            zingueria=("zingueria","sum"),
-            perfileria=("perfileria","sum"),
-        ).reset_index().sort_values("periodo")
-        df_monthly["label"] = df_monthly["periodo"].apply(lambda p: periodo_label(p.to_timestamp()))
-
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=df_monthly["label"], y=df_monthly["zingueria"],
-            name="Zinguería", marker_color=COLORES["primario"],
-            hovertemplate="<b>%{x}</b><br>Zinguería: $%{y:,.0f}<extra></extra>"
-        ))
-        fig.add_trace(go.Bar(
-            x=df_monthly["label"], y=df_monthly["perfileria"],
-            name="Perfilería", marker_color=COLORES["secundario"],
-            hovertemplate="<b>%{x}</b><br>Perfilería: $%{y:,.0f}<extra></extra>"
-        ))
-        fig.update_layout(
-            barmode="stack", height=320,
-            margin=dict(l=0,r=0,t=10,b=0),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
-            xaxis=dict(tickangle=-45),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02)
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-   with col_b:
+    with col_b:
     st.markdown("##### Mix del período")
 
     try:
@@ -99,17 +69,21 @@ def render(datos: dict):
         perf_mes = 0
 
     if (zing_mes + perf_mes) > 0:
-        fig_pie = go.Figure(go.Pie(
-            labels=["Zinguería","Perfilería"],
-            values=[zing_mes, perf_mes],
-            marker_colors=[COLORES["primario"], COLORES["secundario"]],
-            hole=0.45,
-            textinfo="label+percent",
-            hovertemplate="<b>%{label}</b><br>$%{value:,.0f}<extra></extra>"
-        ))
+        fig_pie = go.Figure(
+            go.Pie(
+                labels=["Zinguería", "Perfilería"],
+                values=[zing_mes, perf_mes],
+                marker_colors=[COLORES["primario"], COLORES["secundario"]],
+                hole=0.45,
+                textinfo="label+percent",
+                hovertemplate="<b>%{label}</b><br>$%{value:,.0f}<extra></extra>",
+            )
+        )
         fig_pie.update_layout(
-            height=280, margin=dict(l=0,r=0,t=10,b=0),
-            paper_bgcolor="rgba(0,0,0,0)", showlegend=False
+            height=280,
+            margin=dict(l=0, r=0, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            showlegend=False,
         )
         st.plotly_chart(fig_pie, use_container_width=True)
     else:
@@ -118,25 +92,35 @@ def render(datos: dict):
 # Top clientes del período
 if not df_mes.empty:
     st.markdown("##### Top clientes del período")
-    top = df_mes.groupby("cliente")["total"].sum().sort_values(ascending=False).head(10).reset_index()
+    top = (
+        df_mes.groupby("cliente")["total"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+        .reset_index()
+    )
     top["total_fmt"] = top["total"].apply(ars)
 
-    fig_h = go.Figure(go.Bar(
-        x=top["total"], y=top["cliente"],
-        orientation="h",
-        marker_color=COLORES["primario"],
-        text=top["total_fmt"], textposition="outside",
-        hovertemplate="<b>%{y}</b><br>$%{x:,.0f}<extra></extra>"
-    ))
+    fig_h = go.Figure(
+        go.Bar(
+            x=top["total"],
+            y=top["cliente"],
+            orientation="h",
+            marker_color=COLORES["primario"],
+            text=top["total_fmt"],
+            textposition="outside",
+            hovertemplate="<b>%{y}</b><br>$%{x:,.0f}<extra></extra>",
+        )
+    )
 
     fig_h.update_layout(
-        height=max(250, len(top)*35),
-        margin=dict(l=0,r=80,t=10,b=0),
-        paper_bgcolor="rgba(0,0,0,0)", 
+        height=max(250, len(top) * 35),
+        margin=dict(l=0, r=80, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
         yaxis=dict(autorange="reversed"),
-        showlegend=False
+        showlegend=False,
     )
 
     st.plotly_chart(fig_h, use_container_width=True)
