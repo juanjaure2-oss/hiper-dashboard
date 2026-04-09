@@ -19,29 +19,42 @@ def _get_client():
 def _leer_hoja(client, sheet_id, nombre_hoja, date_cols=None):
     try:
         sh = client.open_by_key(sheet_id)
+        st.write("DEBUG título:", sh.title)
+        st.write("DEBUG hojas:", [ws.title for ws in sh.worksheets()])
+
         ws = sh.worksheet(nombre_hoja)
-        data = ws.get_all_records(numericise_ignore=["all"])
-        df = pd.DataFrame(data)
+        data = ws.get_all_values()
+
+        if not data:
+            return pd.DataFrame()
+
+        headers = [str(h).strip() for h in data[0]]
+        rows = data[1:]
+        df = pd.DataFrame(rows, columns=headers)
+
         if df.empty:
             return df
-        # Strip column names
-        df.columns = [c.strip() for c in df.columns]
-        # Convert date columns
+
         if date_cols:
             for col in date_cols:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
-        # Convert numeric columns (everything that looks numeric)
+
         for col in df.columns:
             if date_cols and col in date_cols:
                 continue
             try:
-                converted = pd.to_numeric(df[col].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+                converted = pd.to_numeric(
+                    df[col].astype(str).str.replace(",", ".", regex=False),
+                    errors="coerce"
+                )
                 if converted.notna().sum() > len(df) * 0.5:
                     df[col] = converted
             except:
                 pass
+
         return df
+
     except Exception as e:
         st.error(f"Error leyendo hoja '{nombre_hoja}': {e}")
         return pd.DataFrame()
