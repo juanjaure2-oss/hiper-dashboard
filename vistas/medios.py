@@ -136,36 +136,41 @@ def render(datos: dict):
 
     fig = go.Figure()
 
-    # 🔵 GOOGLE
-    fig.add_trace(
-        go.Scatter(
-            x=df_g["label"],
-            y=df_g["costo"],
-            name="Google Ads",
-            mode="lines+markers",
-            line=dict(color="#4285F4", width=3),
-        )
+# Google Ads
+fig.add_trace(
+    go.Scatter(
+        x=df_g["label"],
+        y=df_g["costo"],
+        name="Google Ads",
+        mode="lines+markers",
+        line=dict(color="#34A853", width=3),
+        marker=dict(size=7, symbol="circle"),
+        hovertemplate="<b>%{x}</b><br>Google Ads: $%{y:,.0f}<extra></extra>",
     )
+)
 
-    # 🔷 META
-    fig.add_trace(
-        go.Scatter(
-            x=df_m["label"],
-            y=df_m["costo"],
-            name="Meta Ads",
-            mode="lines+markers",
-            line=dict(color="#1877F2", width=3),
-        )
+# Meta Ads
+fig.add_trace(
+    go.Scatter(
+        x=df_m["label"],
+        y=df_m["costo"],
+        name="Meta Ads",
+        mode="lines+markers",
+        line=dict(color="#1877F2", width=3, dash="dash"),
+        marker=dict(size=7, symbol="diamond"),
+        hovertemplate="<b>%{x}</b><br>Meta Ads: $%{y:,.0f}<extra></extra>",
     )
+)
 
-    fig.update_layout(
-        height=320,
-        margin=dict(l=0, r=0, t=10, b=0),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
-        xaxis=dict(tickangle=-45),
-    )
+fig.update_layout(
+    height=320,
+    margin=dict(l=0, r=0, t=10, b=0),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
+    xaxis=dict(tickangle=-45),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02),
+)
 
     st.plotly_chart(fig, use_container_width=True)
 
