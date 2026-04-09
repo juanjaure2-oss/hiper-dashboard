@@ -53,35 +53,31 @@ def render(datos: dict):
     def kpis_plataforma(df, plat):
         d = df[df["plataforma"] == plat]
         return {
-            "costo": _safe_float(d["costo"].sum()) if "costo" in d.columns else 0,
-            "impresiones": _safe_float(d["impresiones"].sum()) if "impresiones" in d.columns else 0,
-            "clics": _safe_float(d["clics"].sum()) if "clics" in d.columns else 0,
-            "conversiones": _safe_float(d["conversiones"].sum()) if "conversiones" in d.columns else 0,
+            "costo": _safe_float(d["costo"].sum()),
+            "impresiones": _safe_float(d["impresiones"].sum()),
+            "clics": _safe_float(d["clics"].sum()),
+            "conversiones": _safe_float(d["conversiones"].sum()),
         }
 
     g_mes = kpis_plataforma(df_mes, "google")
     m_mes = kpis_plataforma(df_mes, "meta")
-    g_ant = kpis_plataforma(df_ant, "google")
-    m_ant = kpis_plataforma(df_ant, "meta")
 
-    inv_total = _safe_float(g_mes["costo"]) + _safe_float(m_mes["costo"])
+    inv_total = g_mes["costo"] + m_mes["costo"]
 
-    # Leads del período para CPL
+    # Leads para CPL
     df_lv = datos.get("leads", pd.DataFrame())
     leads_mes = 0.0
-    if not df_lv.empty:
+    if not df_lv.empty and "fecha" in df_lv.columns and "cantidad" in df_lv.columns:
         df_lv = df_lv.copy()
-        if "fecha" in df_lv.columns:
-            df_lv["fecha"] = pd.to_datetime(df_lv["fecha"], errors="coerce")
-            df_lv = df_lv.dropna(subset=["fecha"])
-            if "cantidad" in df_lv.columns:
-                leads_mes = _safe_float(
-                    df_lv[df_lv["fecha"].dt.to_period("M") == periodo_sel]["cantidad"].sum()
-                )
+        df_lv["fecha"] = pd.to_datetime(df_lv["fecha"], errors="coerce")
+        df_lv = df_lv.dropna(subset=["fecha"])
+        leads_mes = _safe_float(
+            df_lv[df_lv["fecha"].dt.to_period("M") == periodo_sel]["cantidad"].sum()
+        )
 
     cpl = inv_total / leads_mes if leads_mes > 0 else None
 
-    # Métricas
+    # KPIs
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Inversión total medios", ars(inv_total))
     c2.metric("Google Ads", ars(g_mes["costo"]))
@@ -94,45 +90,35 @@ def render(datos: dict):
 
     with col_a:
         st.markdown("##### Google Ads — detalle")
-        ctr_g = g_mes["clics"] / g_mes["impresiones"] if g_mes["impresiones"] > 0 else 0
-        cpc_g = g_mes["costo"] / g_mes["clics"] if g_mes["clics"] > 0 else 0
-        cpa_g = g_mes["costo"] / g_mes["conversiones"] if g_mes["conversiones"] > 0 else 0
+        ctr = g_mes["clics"] / g_mes["impresiones"] if g_mes["impresiones"] else 0
+        cpc = g_mes["costo"] / g_mes["clics"] if g_mes["clics"] else 0
 
-        rows = [
+        for k, v in [
             ("Inversión", ars(g_mes["costo"])),
             ("Impresiones", num(g_mes["impresiones"])),
             ("Clics", num(g_mes["clics"])),
-            ("CTR", f"{ctr_g*100:.2f}%"),
-            ("CPC promedio", ars(cpc_g)),
-            ("Conversiones", num(g_mes["conversiones"])),
-            ("CPA", ars(cpa_g) if g_mes["conversiones"] > 0 else "—"),
-        ]
-
-        for label, val in rows:
-            cc1, cc2 = st.columns([2, 2])
-            cc1.markdown(f"<small style='color:#666'>{label}</small>", unsafe_allow_html=True)
-            cc2.markdown(f"**{val}**")
+            ("CTR", f"{ctr*100:.2f}%"),
+            ("CPC", ars(cpc)),
+        ]:
+            a, b = st.columns([2, 2])
+            a.markdown(f"<small>{k}</small>", unsafe_allow_html=True)
+            b.markdown(f"**{v}**")
 
     with col_b:
         st.markdown("##### Meta Ads — detalle")
-        ctr_m = m_mes["clics"] / m_mes["impresiones"] if m_mes["impresiones"] > 0 else 0
-        cpc_m = m_mes["costo"] / m_mes["clics"] if m_mes["clics"] > 0 else 0
-        cpr_m = m_mes["costo"] / m_mes["conversiones"] if m_mes["conversiones"] > 0 else 0
+        ctr = m_mes["clics"] / m_mes["impresiones"] if m_mes["impresiones"] else 0
+        cpc = m_mes["costo"] / m_mes["clics"] if m_mes["clics"] else 0
 
-        rows = [
+        for k, v in [
             ("Inversión", ars(m_mes["costo"])),
             ("Impresiones", num(m_mes["impresiones"])),
             ("Clics", num(m_mes["clics"])),
-            ("CTR", f"{ctr_m*100:.2f}%"),
-            ("CPC promedio", ars(cpc_m)),
-            ("Resultados", num(m_mes["conversiones"])),
-            ("Costo por resultado", ars(cpr_m) if m_mes["conversiones"] > 0 else "—"),
-        ]
-
-        for label, val in rows:
-            cc1, cc2 = st.columns([2, 2])
-            cc1.markdown(f"<small style='color:#666'>{label}</small>", unsafe_allow_html=True)
-            cc2.markdown(f"**{val}**")
+            ("CTR", f"{ctr*100:.2f}%"),
+            ("CPC", ars(cpc)),
+        ]:
+            a, b = st.columns([2, 2])
+            a.markdown(f"<small>{k}</small>", unsafe_allow_html=True)
+            b.markdown(f"**{v}**")
 
     st.divider()
     st.markdown("##### Evolución de inversión por plataforma")
@@ -142,85 +128,61 @@ def render(datos: dict):
         .sum()
         .reset_index()
     )
+
     df_monthly["label"] = df_monthly["periodo"].apply(lambda p: periodo_label(p.to_timestamp()))
 
     df_g = df_monthly[df_monthly["plataforma"] == "google"].sort_values("periodo")
     df_m = df_monthly[df_monthly["plataforma"] == "meta"].sort_values("periodo")
 
     fig = go.Figure()
+
+    # 🔵 GOOGLE
     fig.add_trace(
         go.Scatter(
             x=df_g["label"],
             y=df_g["costo"],
             name="Google Ads",
             mode="lines+markers",
-            line=dict(color=COLORES["google"], width=2),
-            hovertemplate="<b>%{x}</b><br>Google: $%{y:,.0f}<extra></extra>",
+            line=dict(color="#4285F4", width=3),
         )
     )
+
+    # 🔷 META
     fig.add_trace(
         go.Scatter(
             x=df_m["label"],
             y=df_m["costo"],
             name="Meta Ads",
             mode="lines+markers",
-            line=dict(color=COLORES["meta"], width=2),
-            hovertemplate="<b>%{x}</b><br>Meta: $%{y:,.0f}<extra></extra>",
+            line=dict(color="#1877F2", width=3),
         )
     )
+
     fig.update_layout(
-        height=300,
+        height=320,
         margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
         xaxis=dict(tickangle=-45),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
-    # Campañas del período
+    # Campañas
     st.markdown("##### Campañas del período")
+
     if not df_mes.empty and "campaña" in df_mes.columns:
         df_camp = (
             df_mes.groupby(["plataforma", "campaña"])
-            .agg(
-                costo=("costo", "sum"),
-                impresiones=("impresiones", "sum"),
-                clics=("clics", "sum"),
-                conversiones=("conversiones", "sum"),
-            )
+            .agg(costo=("costo", "sum"), clics=("clics", "sum"))
             .reset_index()
             .sort_values("costo", ascending=False)
         )
 
-        df_camp["costo"] = pd.to_numeric(df_camp["costo"], errors="coerce").fillna(0)
-        df_camp["impresiones"] = pd.to_numeric(df_camp["impresiones"], errors="coerce").fillna(0)
-        df_camp["clics"] = pd.to_numeric(df_camp["clics"], errors="coerce").fillna(0)
-        df_camp["conversiones"] = pd.to_numeric(df_camp["conversiones"], errors="coerce").fillna(0)
+        df_camp["costo"] = df_camp["costo"].apply(ars)
+        df_camp["clics"] = df_camp["clics"].apply(num)
 
-        df_camp["ctr"] = (
-            df_camp["clics"] / df_camp["impresiones"].replace(0, pd.NA)
-        ).apply(lambda x: f"{x*100:.2f}%" if pd.notna(x) and x > 0 else "—")
-
-        df_camp["costo_fmt"] = df_camp["costo"].apply(ars)
-        df_camp["impresiones_fmt"] = df_camp["impresiones"].apply(num)
-        df_camp["clics_fmt"] = df_camp["clics"].apply(num)
-        df_camp["conversiones_fmt"] = df_camp["conversiones"].apply(num)
-
-        st.dataframe(
-            df_camp[
-                ["plataforma", "campaña", "costo_fmt", "impresiones_fmt", "clics_fmt", "ctr", "conversiones_fmt"]
-            ].rename(
-                columns={
-                    "costo_fmt": "costo",
-                    "impresiones_fmt": "impresiones",
-                    "clics_fmt": "clics",
-                    "conversiones_fmt": "conversiones",
-                }
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(df_camp, use_container_width=True, hide_index=True)
     else:
         st.info("Sin campañas para el período seleccionado.")
