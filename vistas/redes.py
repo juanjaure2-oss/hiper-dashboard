@@ -51,7 +51,6 @@ def render(datos: dict):
 
     df_r = df_r.copy()
 
-    # Asegurar columnas mínimas
     for col in [
         "fecha",
         "canal",
@@ -62,7 +61,7 @@ def render(datos: dict):
         "cantidad_contenido",
     ]:
         if col not in df_r.columns:
-            df_r[col] = 0 if col != "canal" and col != "fecha" else None
+            df_r[col] = 0 if col not in ["fecha", "canal"] else None
 
     df_r["fecha"] = pd.to_datetime(df_r["fecha"], errors="coerce", dayfirst=True)
     df_r = df_r.dropna(subset=["fecha"]).copy()
@@ -76,19 +75,14 @@ def render(datos: dict):
         .astype(str)
         .str.lower()
         .str.strip()
-    )
-
-    # Normalizar valores de canal
-    df_r["canal"] = df_r["canal"].replace(
-        {
+        .replace({
             "ig": "instagram",
             "insta": "instagram",
             "fb": "facebook",
             "linkedin ads": "linkedin",
-        }
+        })
     )
 
-    # Numéricos
     for col in ["seguidores_totales", "adquiridos", "impresiones", "interacciones", "cantidad_contenido"]:
         df_r[col] = _to_num(df_r[col])
 
@@ -102,7 +96,6 @@ def render(datos: dict):
     sel = st.selectbox("Período", [str(p) for p in periodos], index=0, key="redes_periodo")
     periodo_sel = pd.Period(sel, freq="M")
 
-    # Agregado por período + canal
     df_agg = (
         df_r.groupby(["periodo", "canal"], as_index=False)
         .agg(
@@ -119,7 +112,6 @@ def render(datos: dict):
 
     st.divider()
 
-    # Métricas por canal
     canales = ["facebook", "instagram", "linkedin"]
     cols = st.columns(len(canales))
 
@@ -134,24 +126,40 @@ def render(datos: dict):
                 st.markdown(
                     f"""
                     <div style="background:#F8F9FA;border-radius:10px;padding:14px;border-top:4px solid {color}">
-                        <div style="font-weight:600;color:{color};margin-bottom:8px">{nombre}</div>
-                        <div style="color:#999;font-size:13px">Sin datos</div>
+                        <div style="font-weight:700;color:{color};margin-bottom:10px">{nombre}</div>
+                        <div style="color:#666;font-size:13px">Sin datos</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
             else:
                 row = d.iloc[0]
+
                 st.markdown(
                     f"""
                     <div style="background:#F8F9FA;border-radius:10px;padding:14px;border-top:4px solid {color}">
-                        <div style="font-weight:600;color:{color};margin-bottom:10px">{nombre}</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
-                            <div><span style="color:#666">Seguidores</span><br><b>{num(row["seguidores_totales"])}</b></div>
-                            <div><span style="color:#666">Adquiridos</span><br><b>+{num(row["adquiridos"])}</b></div>
-                            <div><span style="color:#666">Impresiones</span><br><b>{num(row["impresiones"])}</b></div>
-                            <div><span style="color:#666">Interacciones</span><br><b>{num(row["interacciones"])}</b></div>
-                            <div><span style="color:#666">Contenidos</span><br><b>{num(row["cantidad_contenido"])}</b></div>
+                        <div style="font-weight:700;color:{color};margin-bottom:12px">{nombre}</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px">
+                            <div>
+                                <div style="font-size:12px;color:#666">Seguidores</div>
+                                <div style="font-size:22px;font-weight:700;color:#1D1D1B">{num(row["seguidores_totales"])}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#666">Adquiridos</div>
+                                <div style="font-size:22px;font-weight:700;color:#1D1D1B">+{num(row["adquiridos"])}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#666">Impresiones</div>
+                                <div style="font-size:22px;font-weight:700;color:#1D1D1B">{num(row["impresiones"])}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#666">Interacciones</div>
+                                <div style="font-size:22px;font-weight:700;color:#1D1D1B">{num(row["interacciones"])}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#666">Contenidos</div>
+                                <div style="font-size:22px;font-weight:700;color:#1D1D1B">{num(row["cantidad_contenido"])}</div>
+                            </div>
                         </div>
                     </div>
                     """,
@@ -216,6 +224,7 @@ def render(datos: dict):
         d = df_cont[df_cont["canal"] == canal]
         if d.empty:
             continue
+
         fig_cont.add_trace(
             go.Bar(
                 x=d["label"],
