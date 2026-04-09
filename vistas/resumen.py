@@ -41,6 +41,41 @@ def _clientes_nuevos_desde_ventas(df_v, periodo):
     if df_v is None or df_v.empty or "fecha" not in df_v.columns or "cliente" not in df_v.columns:
         return None
 
+    periodo = pd.Period(periodo, freq="M")
+
+    df = df_v.copy()
+    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=True)
+    df = df.dropna(subset=["fecha"]).copy()
+
+    if df.empty:
+        return None
+
+    df["periodo"] = df["fecha"].dt.to_period("M")
+    df["cliente_norm"] = (
+        df["cliente"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    clientes_mes = set(
+        df.loc[df["periodo"] == periodo, "cliente_norm"]
+        .dropna()
+        .tolist()
+    )
+
+    clientes_anteriores = set(
+        df.loc[df["periodo"] < periodo, "cliente_norm"]
+        .dropna()
+        .tolist()
+    )
+
+    if not clientes_mes:
+        return 0
+
+    nuevos = clientes_mes - clientes_anteriores
+    return len(nuevos)
+
     df = df_v.copy()
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=True)
     df = df.dropna(subset=["fecha"]).copy()
