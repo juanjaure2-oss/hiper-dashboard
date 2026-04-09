@@ -19,8 +19,7 @@ def _get_client():
 def _leer_hoja(client, sheet_id, nombre_hoja, date_cols=None):
     try:
         sh = client.open_by_key(sheet_id)
-        st.write("DEBUG título:", sh.title)
-        st.write("DEBUG hojas:", [ws.title for ws in sh.worksheets()])
+
 
         ws = sh.worksheet(nombre_hoja)
         data = ws.get_all_values()
