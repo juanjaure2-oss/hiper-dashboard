@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
-from utils.formato import ars, num, periodo_label, variacion_pct
+from utils.formato import ars, num, periodo_label, variacion
 from utils.config import COLORES
 
 def render(datos: dict):
