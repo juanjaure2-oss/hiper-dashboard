@@ -6,7 +6,15 @@ from utils.config import COLORES
 
 
 def _to_num(series):
-    return pd.to_numeric(series, errors="coerce").fillna(0)
+    return pd.to_numeric(
+        series.astype(str)
+        .str.strip()
+        .str.replace("$", "", regex=False)
+        .str.replace(" ", "", regex=False)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False),
+        errors="coerce"
+    ).fillna(0)
 
 
 def render(datos: dict):
