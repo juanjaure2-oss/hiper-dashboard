@@ -76,39 +76,6 @@ def _clientes_nuevos_desde_ventas(df_v, periodo):
     nuevos = clientes_mes - clientes_anteriores
     return len(nuevos)
 
-    df = df_v.copy()
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=True)
-    df = df.dropna(subset=["fecha"]).copy()
-
-    if df.empty:
-        return None
-
-    df["periodo"] = df["fecha"].dt.to_period("M")
-    df["cliente_norm"] = (
-        df["cliente"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-    )
-
-    clientes_mes = set(
-        df.loc[df["periodo"] == periodo, "cliente_norm"]
-        .dropna()
-        .tolist()
-    )
-
-    clientes_anteriores = set(
-        df.loc[df["periodo"] < periodo, "cliente_norm"]
-        .dropna()
-        .tolist()
-    )
-
-    if not clientes_mes:
-        return 0
-
-    nuevos = clientes_mes - clientes_anteriores
-    return len(nuevos)
-
 
 def render(datos: dict):
     df_kpi = datos.get("kpi", pd.DataFrame())
@@ -169,8 +136,11 @@ def render(datos: dict):
         else None
     )
 
-    clientes_nuevos = _clientes_nuevos_desde_ventas(df_v, ult)
-    clientes_nuevos_p = _clientes_nuevos_desde_ventas(df_v, ult - 1)
+    periodo_actual = pd.Period(ult, freq="M")
+    periodo_anterior = periodo_actual - 1
+
+    clientes_nuevos = _clientes_nuevos_desde_ventas(df_v, periodo_actual)
+    clientes_nuevos_p = _clientes_nuevos_desde_ventas(df_v, periodo_anterior)
 
     # Header
     st.markdown(f"### Resumen ejecutivo — {periodo_label(ult)}")
