@@ -1,31 +1,51 @@
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
 from utils.formato import ars, num, periodo_label, variacion
 from utils.config import COLORES
 
 
+def _to_num(series):
+    return pd.to_numeric(series, errors="coerce").fillna(0)
+
+
 def render(datos: dict):
     df_v = datos.get("ventas", pd.DataFrame())
-    df_kpi = datos.get("kpi", pd.DataFrame())
 
     if df_v.empty:
         st.warning("Sin datos de ventas.")
         return
 
     df_v = df_v.copy()
-    df_v["fecha"] = pd.to_datetime(df_v["fecha"], errors="coerce")
+
+    # Normalización mínima de columnas esperadas
+    for col in ["fecha", "cliente", "cantidad", "zingueria", "perfileria", "total"]:
+        if col not in df_v.columns:
+            if col == "cliente":
+                df_v[col] = ""
+            else:
+                df_v[col] = 0
+
+    df_v["fecha"] = pd.to_datetime(df_v["fecha"], errors="coerce", dayfirst=True)
     df_v = df_v.dropna(subset=["fecha"])
+
+    # Forzar numéricos para evitar vacíos / strings
+    df_v["cantidad"] = _to_num(df_v["cantidad"])
+    df_v["zingueria"] = _to_num(df_v["zingueria"])
+    df_v["perfileria"] = _to_num(df_v["perfileria"])
+    df_v["total"] = _to_num(df_v["total"])
+
     df_v["periodo"] = df_v["fecha"].dt.to_period("M")
     df_v["label"] = df_v["fecha"].apply(lambda x: periodo_label(x) if pd.notna(x) else "")
 
     # Filtro de período
     periodos = sorted(df_v["periodo"].unique(), reverse=True)
     periodo_labels = [str(p) for p in periodos]
+
     col_f1, col_f2 = st.columns([3, 1])
     with col_f1:
         sel = st.selectbox("Período", options=periodo_labels, index=0, key="ventas_periodo")
+
     periodo_sel = pd.Period(sel, freq="M")
 
     st.divider()
@@ -69,6 +89,7 @@ def render(datos: dict):
             )
             .sort_values("periodo")
         )
+
         hist["fecha"] = hist["periodo"].dt.to_timestamp()
         hist["label"] = hist["fecha"].apply(periodo_label)
 
@@ -83,6 +104,7 @@ def render(datos: dict):
                     mode="lines+markers",
                     name="Ventas",
                     line=dict(color=COLORES["primario"], width=3),
+                    hovertemplate="<b>%{x}</b><br>$%{y:,.0f}<extra></extra>",
                 )
             )
             fig.update_layout(
@@ -90,7 +112,11 @@ def render(datos: dict):
                 margin=dict(l=0, r=0, t=20, b=0),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
+                yaxis=dict(
+                    tickformat="$,.0f",
+                    gridcolor="#EEE",
+                    rangemode="tozero",
+                ),
                 xaxis=dict(tickangle=-45),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02),
             )
@@ -104,6 +130,7 @@ def render(datos: dict):
                     y=hist["zingueria"],
                     name="Zinguería",
                     marker_color=COLORES["primario"],
+                    hovertemplate="<b>%{x}</b><br>Zinguería: $%{y:,.0f}<extra></extra>",
                 )
             )
             fig.add_trace(
@@ -112,6 +139,7 @@ def render(datos: dict):
                     y=hist["perfileria"],
                     name="Perfilería",
                     marker_color=COLORES["secundario"],
+                    hovertemplate="<b>%{x}</b><br>Perfilería: $%{y:,.0f}<extra></extra>",
                 )
             )
             fig.update_layout(
@@ -120,7 +148,11 @@ def render(datos: dict):
                 margin=dict(l=0, r=0, t=20, b=0),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
+                yaxis=dict(
+                    tickformat="$,.0f",
+                    gridcolor="#EEE",
+                    rangemode="tozero",
+                ),
                 xaxis=dict(tickangle=-45),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02),
             )
@@ -134,6 +166,7 @@ def render(datos: dict):
                     y=hist["cantidad"],
                     name="Transacciones",
                     marker_color=COLORES["acento"],
+                    hovertemplate="<b>%{x}</b><br>Transacciones: %{y:,.0f}<extra></extra>",
                 )
             )
             fig.update_layout(
@@ -141,7 +174,7 @@ def render(datos: dict):
                 margin=dict(l=0, r=0, t=20, b=0),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(gridcolor="#EEE"),
+                yaxis=dict(gridcolor="#EEE", rangemode="tozero"),
                 xaxis=dict(tickangle=-45),
                 showlegend=False,
             )
@@ -150,15 +183,8 @@ def render(datos: dict):
     with col_b:
         st.markdown("##### Mix del período")
 
-        try:
-            zing_mes = float(zing_mes) if zing_mes else 0
-        except Exception:
-            zing_mes = 0
-
-        try:
-            perf_mes = float(perf_mes) if perf_mes else 0
-        except Exception:
-            perf_mes = 0
+        zing_mes = float(zing_mes) if pd.notna(zing_mes) else 0
+        perf_mes = float(perf_mes) if pd.notna(perf_mes) else 0
 
         if (zing_mes + perf_mes) > 0:
             fig_pie = go.Figure(
@@ -184,6 +210,7 @@ def render(datos: dict):
     # Top clientes del período
     if not df_mes.empty and "cliente" in df_mes.columns:
         st.markdown("##### Top clientes del período")
+
         top = (
             df_mes.groupby("cliente")["total"]
             .sum()
@@ -210,7 +237,7 @@ def render(datos: dict):
             margin=dict(l=0, r=80, t=10, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
+            xaxis=dict(tickformat="$,.0f", gridcolor="#EEE", rangemode="tozero"),
             yaxis=dict(autorange="reversed"),
             showlegend=False,
         )
