@@ -9,6 +9,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
 ]
 
+
 def _get_client():
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
@@ -16,11 +17,10 @@ def _get_client():
     )
     return gspread.authorize(creds)
 
+
 def _leer_hoja(client, sheet_id, nombre_hoja, date_cols=None):
     try:
         sh = client.open_by_key(sheet_id)
-
-
         ws = sh.worksheet(nombre_hoja)
         data = ws.get_all_values()
 
@@ -34,31 +34,33 @@ def _leer_hoja(client, sheet_id, nombre_hoja, date_cols=None):
         if df.empty:
             return df
 
+        # Convertir fechas
         if date_cols:
             for col in date_cols:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
 
+        # Convertir numéricos con formato argentino
         for col in df.columns:
-    if date_cols and col in date_cols:
-        continue
-    try:
-        serie = (
-            df[col]
-            .astype(str)
-            .str.strip()
-            .str.replace("$", "", regex=False)
-            .str.replace(" ", "", regex=False)
-            .str.replace(".", "", regex=False)   # quita separador de miles
-            .str.replace(",", ".", regex=False)  # convierte decimal argentino
-        )
+            if date_cols and col in date_cols:
+                continue
+            try:
+                serie = (
+                    df[col]
+                    .astype(str)
+                    .str.strip()
+                    .str.replace("$", "", regex=False)
+                    .str.replace(" ", "", regex=False)
+                    .str.replace(".", "", regex=False)
+                    .str.replace(",", ".", regex=False)
+                )
 
-        converted = pd.to_numeric(serie, errors="coerce")
+                converted = pd.to_numeric(serie, errors="coerce")
 
-        if converted.notna().sum() > len(df) * 0.5:
-            df[col] = converted
-    except Exception:
-        pass
+                if converted.notna().sum() > len(df) * 0.5:
+                    df[col] = converted
+            except Exception:
+                pass
 
         return df
 
@@ -66,14 +68,18 @@ def _leer_hoja(client, sheet_id, nombre_hoja, date_cols=None):
         st.error(f"Error leyendo hoja '{nombre_hoja}': {e}")
         return pd.DataFrame()
 
+
 @st.cache_data(ttl=300, show_spinner="Actualizando datos...")
 def cargar_datos():
     client = _get_client()
     datos = {}
+
     for key, nombre in HOJAS.items():
         dcols = DATE_COLS.get(key, [])
         datos[key] = _leer_hoja(client, SHEET_ID, nombre, dcols)
+
     return datos
+
 
 def refrescar():
     st.cache_data.clear()
