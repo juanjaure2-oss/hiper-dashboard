@@ -39,8 +39,7 @@ def render(datos: dict):
     perf_mes  = df_mes["perfileria"].sum() if not df_mes.empty else 0
     cant_mes  = df_mes["cantidad"].sum() if not df_mes.empty else 0
 
-    dv = variacion_pct(total_mes, total_ant)
-    delta_str = f"{'▲' if dv and dv>=0 else '▼'} {abs(dv)*100:.1f}% vs mes anterior" if dv is not None else ""
+    dv, delta_str = variacion(total_mes, total_ant)
 
     c1,c2,c3,c4 = st.columns(4)
     with c1:
