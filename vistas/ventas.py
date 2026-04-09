@@ -6,15 +6,45 @@ from utils.config import COLORES
 
 
 def _to_num(series):
-    return pd.to_numeric(
-        series.astype(str)
-        .str.strip()
+    # Si ya viene numérico, no tocar formato
+    if pd.api.types.is_numeric_dtype(series):
+        return pd.to_numeric(series, errors="coerce").fillna(0)
+
+    s = series.astype(str).str.strip()
+
+    # limpiar vacíos comunes
+    s = s.replace(
+        {
+            "": None,
+            "nan": None,
+            "None": None,
+            "—": None,
+        }
+    )
+
+    # si tiene coma, asumimos formato argentino: 1.234.567,89
+    mask_comma = s.str.contains(",", na=False)
+
+    s_arg = (
+        s.where(mask_comma)
         .str.replace("$", "", regex=False)
         .str.replace(" ", "", regex=False)
         .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False),
-        errors="coerce"
-    ).fillna(0)
+        .str.replace(",", ".", regex=False)
+    )
+
+    # si no tiene coma, intentamos parseo directo
+    s_std = (
+        s.where(~mask_comma)
+        .str.replace("$", "", regex=False)
+        .str.replace(" ", "", regex=False)
+    )
+
+    out = pd.Series(index=series.index, dtype="float64")
+    out.loc[mask_comma] = pd.to_numeric(s_arg.loc[mask_comma], errors="coerce")
+    out.loc[~mask_comma] = pd.to_numeric(s_std.loc[~mask_comma], errors="coerce")
+
+    return out.fillna(0)
 
 
 def render(datos: dict):
@@ -37,7 +67,7 @@ def render(datos: dict):
     df_v["fecha"] = pd.to_datetime(df_v["fecha"], errors="coerce", dayfirst=True)
     df_v = df_v.dropna(subset=["fecha"])
 
-    # Forzar numéricos para evitar vacíos / strings
+    # Forzar numéricos
     df_v["cantidad"] = _to_num(df_v["cantidad"])
     df_v["zingueria"] = _to_num(df_v["zingueria"])
     df_v["perfileria"] = _to_num(df_v["perfileria"])
