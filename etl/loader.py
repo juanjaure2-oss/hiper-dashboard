@@ -41,17 +41,25 @@ def _leer_hoja(client, sheet_id, nombre_hoja, date_cols=None):
                     df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
 
         for col in df.columns:
-            if date_cols and col in date_cols:
-                continue
-            try:
-                converted = pd.to_numeric(
-                    df[col].astype(str).str.replace(",", ".", regex=False),
-                    errors="coerce"
-                )
-                if converted.notna().sum() > len(df) * 0.5:
-                    df[col] = converted
-            except:
-                pass
+    if date_cols and col in date_cols:
+        continue
+    try:
+        serie = (
+            df[col]
+            .astype(str)
+            .str.strip()
+            .str.replace("$", "", regex=False)
+            .str.replace(" ", "", regex=False)
+            .str.replace(".", "", regex=False)   # quita separador de miles
+            .str.replace(",", ".", regex=False)  # convierte decimal argentino
+        )
+
+        converted = pd.to_numeric(serie, errors="coerce")
+
+        if converted.notna().sum() > len(df) * 0.5:
+            df[col] = converted
+    except Exception:
+        pass
 
         return df
 
