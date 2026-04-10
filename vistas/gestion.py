@@ -21,38 +21,52 @@ def render(datos: dict):
     # =========================
     periodos_set = set()
 
+    # PIEZAS
     if not df_piezas.empty and "fecha" in df_piezas.columns:
         df_piezas = df_piezas.copy()
+        df_piezas.columns = df_piezas.columns.str.strip().str.lower()
         df_piezas = _parse_fecha(df_piezas, "fecha")
         df_piezas = df_piezas.dropna(subset=["fecha"])
+
         if not df_piezas.empty:
             df_piezas["periodo"] = df_piezas["fecha"].dt.to_period("M")
             periodos_set.update(df_piezas["periodo"].dropna().unique())
 
+    # REUNIONES
     if not df_reuniones.empty and "fecha" in df_reuniones.columns:
         df_reuniones = df_reuniones.copy()
+        df_reuniones.columns = df_reuniones.columns.str.strip().str.lower()
         df_reuniones = _parse_fecha(df_reuniones, "fecha")
         df_reuniones = df_reuniones.dropna(subset=["fecha"])
+
         if not df_reuniones.empty:
             df_reuniones["periodo"] = df_reuniones["fecha"].dt.to_period("M")
             periodos_set.update(df_reuniones["periodo"].dropna().unique())
 
+    # TAREAS
     if not df_tareas.empty:
         df_tareas = df_tareas.copy()
+        df_tareas.columns = df_tareas.columns.str.strip().str.lower()
+
         for c in ["fecha_inicio", "fecha_vencimiento", "fecha"]:
             df_tareas = _parse_fecha(df_tareas, c)
 
-        # priorizamos fecha_vencimiento, si no fecha_inicio, si no fecha
-        if "fecha_vencimiento" in df_tareas.columns and df_tareas["fecha_vencimiento"].notna().any():
-            df_tareas["periodo_ref"] = df_tareas["fecha_vencimiento"].dt.to_period("M")
-        elif "fecha_inicio" in df_tareas.columns and df_tareas["fecha_inicio"].notna().any():
-            df_tareas["periodo_ref"] = df_tareas["fecha_inicio"].dt.to_period("M")
-        elif "fecha" in df_tareas.columns and df_tareas["fecha"].notna().any():
-            df_tareas["periodo_ref"] = df_tareas["fecha"].dt.to_period("M")
-        else:
-            df_tareas["periodo_ref"] = pd.NaT
+        # periodo_ref seguro: primero vencimiento, luego inicio, luego fecha
+        df_tareas["periodo_ref"] = pd.NaT
 
-        periodos_set.update([p for p in df_tareas["periodo_ref"].dropna().unique()])
+        if "fecha_vencimiento" in df_tareas.columns:
+            mask_vto = df_tareas["fecha_vencimiento"].notna()
+            df_tareas.loc[mask_vto, "periodo_ref"] = df_tareas.loc[mask_vto, "fecha_vencimiento"].dt.to_period("M")
+
+        if "fecha_inicio" in df_tareas.columns:
+            mask_ini = df_tareas["periodo_ref"].isna() & df_tareas["fecha_inicio"].notna()
+            df_tareas.loc[mask_ini, "periodo_ref"] = df_tareas.loc[mask_ini, "fecha_inicio"].dt.to_period("M")
+
+        if "fecha" in df_tareas.columns:
+            mask_fecha = df_tareas["periodo_ref"].isna() & df_tareas["fecha"].notna()
+            df_tareas.loc[mask_fecha, "periodo_ref"] = df_tareas.loc[mask_fecha, "fecha"].dt.to_period("M")
+
+        periodos_set.update(df_tareas["periodo_ref"].dropna().unique())
 
     if not periodos_set:
         st.warning("Sin datos de gestión.")
@@ -94,17 +108,23 @@ def render(datos: dict):
     tareas_vencidas = 0
 
     if not df_tareas_mes.empty:
-        estado = df_tareas_mes["estado"].astype(str).str.lower().str.strip() if "estado" in df_tareas_mes.columns else pd.Series(dtype="object")
-        tareas_abiertas = (estado != "completada").sum() if not estado.empty else len(df_tareas_mes)
-        tareas_completadas = (estado == "completada").sum() if not estado.empty else 0
+        if "estado" in df_tareas_mes.columns:
+            estado_mes = df_tareas_mes["estado"].fillna("pendiente").astype(str).str.lower().str.strip()
+        else:
+            estado_mes = pd.Series(["pendiente"] * len(df_tareas_mes), index=df_tareas_mes.index)
+
+        tareas_abiertas = int((estado_mes != "completada").sum())
+        tareas_completadas = int((estado_mes == "completada").sum())
 
         if "fecha_vencimiento" in df_tareas_mes.columns:
             hoy = pd.Timestamp.today().normalize()
-            tareas_vencidas = df_tareas_mes[
-                (df_tareas_mes["fecha_vencimiento"].notna()) &
-                (df_tareas_mes["fecha_vencimiento"] < hoy) &
-                (estado != "completada")
-            ].shape[0]
+            tareas_vencidas = int(
+                (
+                    df_tareas_mes["fecha_vencimiento"].notna()
+                    & (df_tareas_mes["fecha_vencimiento"] < hoy)
+                    & (estado_mes != "completada")
+                ).sum()
+            )
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Piezas del período", int(piezas_total))
@@ -204,38 +224,42 @@ def render(datos: dict):
         st.info("Sin tareas cargadas.")
         return
 
-    df_t = df_tareas.copy()
-
     estado_color = {
         "completada": "🟢",
         "en_proceso": "🟡",
         "pendiente": "🔴",
     }
 
-    if "estado" not in df_t.columns:
-        df_t["estado"] = "sin_estado"
+    if "estado" not in df_tareas.columns:
+        df_tareas["estado"] = "pendiente"
 
-    df_t["estado"] = df_t["estado"].fillna("sin_estado").astype(str).str.lower().str.strip()
-    df_t["est_icon"] = df_t["estado"].map(estado_color).fillna("⚪")
-    df_t["estado_fmt"] = df_t["est_icon"] + " " + df_t["estado"]
+    df_tareas["estado"] = df_tareas["estado"].fillna("pendiente").astype(str).str.lower().str.strip()
+    df_tareas["est_icon"] = df_tareas["estado"].map(estado_color).fillna("⚪")
+    df_tareas["estado_fmt"] = df_tareas["est_icon"] + " " + df_tareas["estado"]
+
+    # Si hay tareas del período, mostramos esas. Si no, mostramos todas.
+    df_t_view = df_tareas_mes.copy() if not df_tareas_mes.empty else df_tareas.copy()
+
+    if "estado_fmt" not in df_t_view.columns:
+        if "estado" not in df_t_view.columns:
+            df_t_view["estado"] = "pendiente"
+        df_t_view["estado"] = df_t_view["estado"].fillna("pendiente").astype(str).str.lower().str.strip()
+        df_t_view["est_icon"] = df_t_view["estado"].map(estado_color).fillna("⚪")
+        df_t_view["estado_fmt"] = df_t_view["est_icon"] + " " + df_t_view["estado"]
 
     # filtro principal por estado
-    estados_disp = ["Todos"] + sorted(df_t["estado"].dropna().unique().tolist())
+    estados_disp = ["Todos"] + sorted(df_t_view["estado"].dropna().unique().tolist())
     filtro_estado = st.selectbox("Filtrar por estado", estados_disp, key="tareas_filtro_estado")
 
-    # trabajamos sobre tareas del período
-    df_t_view = df_t_mes.copy() if not df_tareas_mes.empty else df_t.copy()
-
     if filtro_estado != "Todos":
-        df_t_view = df_t_view[df_t_view["estado"] == filtro_estado]
+        df_t_view = df_t_view[df_t_view["estado"] == filtro_estado].copy()
 
-    # resumen rápido
     colx1, colx2 = st.columns(2)
     with colx1:
-        st.markdown(f"**Tareas del período:** {len(df_t_view)}")
+        st.markdown(f"**Tareas mostradas:** {len(df_t_view)}")
     with colx2:
-        completadas = (df_t_view["estado"] == "completada").sum() if "estado" in df_t_view.columns else 0
-        st.markdown(f"**Completadas del período:** {int(completadas)}")
+        completadas_view = int((df_t_view["estado"] == "completada").sum()) if "estado" in df_t_view.columns else 0
+        st.markdown(f"**Completadas:** {completadas_view}")
 
     cols_show = [
         "estado_fmt",
@@ -254,5 +278,6 @@ def render(datos: dict):
     for c in ["fecha_inicio", "fecha_vencimiento"]:
         if c in df_show.columns:
             df_show[c] = pd.to_datetime(df_show[c], errors="coerce").dt.strftime("%d/%m/%Y")
+            df_show[c] = df_show[c].fillna("")
 
     st.dataframe(df_show, use_container_width=True, hide_index=True)
