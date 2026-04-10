@@ -1,7 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
-from utils.formato import num, periodo_label
 from utils.config import COLORES
 
 
@@ -16,9 +15,6 @@ def render(datos: dict):
     df_reuniones = datos.get("reuniones", pd.DataFrame())
     df_tareas = datos.get("tareas", pd.DataFrame())
 
-    # =========================
-    # PREPARACIÓN DE PERÍODOS
-    # =========================
     periodos_set = set()
 
     # PIEZAS
@@ -27,7 +23,6 @@ def render(datos: dict):
         df_piezas.columns = df_piezas.columns.str.strip().str.lower()
         df_piezas = _parse_fecha(df_piezas, "fecha")
         df_piezas = df_piezas.dropna(subset=["fecha"])
-
         if not df_piezas.empty:
             df_piezas["periodo"] = df_piezas["fecha"].dt.to_period("M")
             periodos_set.update(df_piezas["periodo"].dropna().unique())
@@ -38,7 +33,6 @@ def render(datos: dict):
         df_reuniones.columns = df_reuniones.columns.str.strip().str.lower()
         df_reuniones = _parse_fecha(df_reuniones, "fecha")
         df_reuniones = df_reuniones.dropna(subset=["fecha"])
-
         if not df_reuniones.empty:
             df_reuniones["periodo"] = df_reuniones["fecha"].dt.to_period("M")
             periodos_set.update(df_reuniones["periodo"].dropna().unique())
@@ -51,20 +45,20 @@ def render(datos: dict):
         for c in ["fecha_inicio", "fecha_vencimiento", "fecha"]:
             df_tareas = _parse_fecha(df_tareas, c)
 
-        # periodo_ref seguro: primero vencimiento, luego inicio, luego fecha
-        df_tareas["periodo_ref"] = pd.NaT
+        periodo_vto = df_tareas["fecha_vencimiento"].dt.to_period("M") if "fecha_vencimiento" in df_tareas.columns else None
+        periodo_ini = df_tareas["fecha_inicio"].dt.to_period("M") if "fecha_inicio" in df_tareas.columns else None
+        periodo_fecha = df_tareas["fecha"].dt.to_period("M") if "fecha" in df_tareas.columns else None
 
-        if "fecha_vencimiento" in df_tareas.columns:
-            mask_vto = df_tareas["fecha_vencimiento"].notna()
-            df_tareas.loc[mask_vto, "periodo_ref"] = df_tareas.loc[mask_vto, "fecha_vencimiento"].dt.to_period("M")
+        if periodo_vto is not None:
+            df_tareas["periodo_ref"] = periodo_vto
+        else:
+            df_tareas["periodo_ref"] = pd.Series([pd.NaT] * len(df_tareas), index=df_tareas.index, dtype="object")
 
-        if "fecha_inicio" in df_tareas.columns:
-            mask_ini = df_tareas["periodo_ref"].isna() & df_tareas["fecha_inicio"].notna()
-            df_tareas.loc[mask_ini, "periodo_ref"] = df_tareas.loc[mask_ini, "fecha_inicio"].dt.to_period("M")
+        if periodo_ini is not None:
+            df_tareas["periodo_ref"] = df_tareas["periodo_ref"].combine_first(periodo_ini)
 
-        if "fecha" in df_tareas.columns:
-            mask_fecha = df_tareas["periodo_ref"].isna() & df_tareas["fecha"].notna()
-            df_tareas.loc[mask_fecha, "periodo_ref"] = df_tareas.loc[mask_fecha, "fecha"].dt.to_period("M")
+        if periodo_fecha is not None:
+            df_tareas["periodo_ref"] = df_tareas["periodo_ref"].combine_first(periodo_fecha)
 
         periodos_set.update(df_tareas["periodo_ref"].dropna().unique())
 
@@ -79,28 +73,13 @@ def render(datos: dict):
     sel = st.selectbox("Período", labels_periodos, index=0, key="gestion_periodo")
     periodo_sel = pd.Period(sel, freq="M")
 
-    # =========================
     # FILTROS DEL MES
-    # =========================
-    df_piezas_mes = pd.DataFrame()
-    if not df_piezas.empty and "periodo" in df_piezas.columns:
-        df_piezas_mes = df_piezas[df_piezas["periodo"] == periodo_sel].copy()
+    df_piezas_mes = df_piezas[df_piezas["periodo"] == periodo_sel].copy() if not df_piezas.empty and "periodo" in df_piezas.columns else pd.DataFrame()
+    df_reuniones_mes = df_reuniones[df_reuniones["periodo"] == periodo_sel].copy() if not df_reuniones.empty and "periodo" in df_reuniones.columns else pd.DataFrame()
+    df_tareas_mes = df_tareas[df_tareas["periodo_ref"] == periodo_sel].copy() if not df_tareas.empty and "periodo_ref" in df_tareas.columns else pd.DataFrame()
 
-    df_reuniones_mes = pd.DataFrame()
-    if not df_reuniones.empty and "periodo" in df_reuniones.columns:
-        df_reuniones_mes = df_reuniones[df_reuniones["periodo"] == periodo_sel].copy()
-
-    df_tareas_mes = pd.DataFrame()
-    if not df_tareas.empty and "periodo_ref" in df_tareas.columns:
-        df_tareas_mes = df_tareas[df_tareas["periodo_ref"] == periodo_sel].copy()
-
-    # =========================
-    # KPIs DEL PERÍODO
-    # =========================
-    piezas_total = 0
-    if not df_piezas_mes.empty and "cantidad" in df_piezas_mes.columns:
-        piezas_total = pd.to_numeric(df_piezas_mes["cantidad"], errors="coerce").fillna(0).sum()
-
+    # KPIs
+    piezas_total = pd.to_numeric(df_piezas_mes["cantidad"], errors="coerce").fillna(0).sum() if not df_piezas_mes.empty and "cantidad" in df_piezas_mes.columns else 0
     reuniones_total = len(df_reuniones_mes)
 
     tareas_abiertas = 0
@@ -134,14 +113,11 @@ def render(datos: dict):
 
     st.divider()
 
-    # =========================
     # REUNIONES + PIEZAS
-    # =========================
     col_a, col_b = st.columns([3, 2])
 
     with col_a:
         st.markdown("##### Reuniones por tipo")
-
         if df_reuniones_mes.empty or "tipo" not in df_reuniones_mes.columns:
             st.info("Sin reuniones para el período seleccionado.")
         else:
@@ -163,7 +139,6 @@ def render(datos: dict):
                     marker_color=COLORES["primario"],
                     text=por_tipo["cantidad"],
                     textposition="outside",
-                    hovertemplate="<b>%{y}</b><br>%{x} reuniones<extra></extra>",
                 )
             )
             fig_r.update_layout(
@@ -179,7 +154,6 @@ def render(datos: dict):
 
     with col_b:
         st.markdown("##### Piezas por área")
-
         if df_piezas_mes.empty or "area" not in df_piezas_mes.columns or "cantidad" not in df_piezas_mes.columns:
             st.info("Sin piezas para el período seleccionado.")
         else:
@@ -199,7 +173,6 @@ def render(datos: dict):
                     marker_color=COLORES["secundario"],
                     text=por_area["cantidad"],
                     textposition="outside",
-                    hovertemplate="<b>%{y}</b><br>%{x} piezas<extra></extra>",
                 )
             )
             fig_p.update_layout(
@@ -215,9 +188,7 @@ def render(datos: dict):
 
     st.divider()
 
-    # =========================
     # TABLERO DE TAREAS
-    # =========================
     st.markdown("##### Proyectos y tareas del período")
 
     if df_tareas.empty:
@@ -237,7 +208,6 @@ def render(datos: dict):
     df_tareas["est_icon"] = df_tareas["estado"].map(estado_color).fillna("⚪")
     df_tareas["estado_fmt"] = df_tareas["est_icon"] + " " + df_tareas["estado"]
 
-    # Si hay tareas del período, mostramos esas. Si no, mostramos todas.
     df_t_view = df_tareas_mes.copy() if not df_tareas_mes.empty else df_tareas.copy()
 
     if "estado_fmt" not in df_t_view.columns:
@@ -247,7 +217,6 @@ def render(datos: dict):
         df_t_view["est_icon"] = df_t_view["estado"].map(estado_color).fillna("⚪")
         df_t_view["estado_fmt"] = df_t_view["est_icon"] + " " + df_t_view["estado"]
 
-    # filtro principal por estado
     estados_disp = ["Todos"] + sorted(df_t_view["estado"].dropna().unique().tolist())
     filtro_estado = st.selectbox("Filtrar por estado", estados_disp, key="tareas_filtro_estado")
 
