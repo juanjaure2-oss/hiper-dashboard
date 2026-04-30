@@ -22,33 +22,15 @@ def render(datos: dict, colores: dict):
         return
 
     df_ads = df_ads.copy()
-
-    # ── Debug expandible (ayuda a diagnosticar problemas de formato) ──
-    with st.expander("🔍 Debug — datos crudos de ads_mensual", expanded=False):
-        st.write("**Primeras 5 filas crudas:**")
-        st.dataframe(df_ads.head(5))
-        st.write(f"**Tipos de columnas:** {df_ads.dtypes.to_dict()}")
-        if "fecha" in df_ads.columns:
-            st.write(f"**Valores únicos de fecha (primeros 10):** {df_ads['fecha'].head(10).tolist()}")
-
-    # Parsear fecha
-    df_ads["fecha"] = pd.to_datetime(df_ads["fecha"], errors="coerce", dayfirst=True)
+    df_ads["fecha"] = pd.to_datetime(df_ads["fecha"], errors="coerce")
     df_ads = df_ads.dropna(subset=["fecha"])
 
-    # Forzar numéricos
     for col in ["impresiones","clics","ctr","conversiones","costo","cpc","costo_por_conversion"]:
         if col in df_ads.columns:
             df_ads[col] = df_ads[col].apply(_n)
 
     df_ads["plataforma"] = df_ads["plataforma"].astype(str).str.lower().str.strip()
     df_ads["periodo"]    = df_ads["fecha"].dt.to_period("M")
-
-    with st.expander("🔍 Debug — después de parsear", expanded=False):
-        st.write("**Períodos detectados:**", sorted(df_ads["periodo"].unique().astype(str).tolist()))
-        st.write("**Plataformas:**", df_ads["plataforma"].unique().tolist())
-        grp = df_ads.groupby(["periodo","plataforma"])["costo"].sum().reset_index()
-        st.write("**Costo por período y plataforma:**")
-        st.dataframe(grp)
 
     periodos = sorted(df_ads["periodo"].unique(), reverse=True)
     if not periodos:
@@ -81,7 +63,7 @@ def render(datos: dict, colores: dict):
     leads_mes = 0
     if not df_lv.empty:
         df_lv = df_lv.copy()
-        df_lv["fecha"]    = pd.to_datetime(df_lv["fecha"], errors="coerce", dayfirst=True)
+        df_lv["fecha"]    = pd.to_datetime(df_lv["fecha"], errors="coerce")
         df_lv["cantidad"] = df_lv["cantidad"].apply(_n)
         leads_mes = int(df_lv[df_lv["fecha"].dt.to_period("M") == periodo_sel]["cantidad"].sum())
     cpl = inv_total / leads_mes if leads_mes > 0 else None
@@ -144,9 +126,9 @@ def render(datos: dict, colores: dict):
                    .agg(costo=("costo","sum"), impresiones=("impresiones","sum"),
                         clics=("clics","sum"), conversiones=("conversiones","sum"))
                    .reset_index().sort_values("costo", ascending=False))
-        df_camp["ctr"]   = (df_camp["clics"]/df_camp["impresiones"]).apply(
+        df_camp["ctr"] = (df_camp["clics"]/df_camp["impresiones"]).apply(
             lambda x: f"{x*100:.2f}%" if x > 0 else "—")
-        df_camp["costo_fmt"] = df_camp["costo"].apply(ars)
+        df_camp["costo_fmt"]   = df_camp["costo"].apply(ars)
         df_camp["impresiones"] = df_camp["impresiones"].apply(num)
         df_camp["clics"]       = df_camp["clics"].apply(num)
         st.dataframe(
