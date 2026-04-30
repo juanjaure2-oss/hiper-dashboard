@@ -4,7 +4,7 @@
 
 EMPRESAS = {
     "Hiper Argentina": {
-        "sheet_id": "1dbiyQ3uox69Xd-3G3Z5apamM0Ut6S04g",
+        "sheet_id": "1IG3h-hwSmUv9YTuX11PI4XqRjmXwQ4TtOCrWG634Cug",
         "color_primario": "#C0392B",
         "icono": "🏭",
     },
