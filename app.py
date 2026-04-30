@@ -1,6 +1,7 @@
 import streamlit as st
 from etl.loader import cargar_datos, refrescar
 from utils.config import EMPRESAS, get_colores
+from utils.auth import login, logout, get_empresas_permitidas, get_nombre, es_admin
 from vistas import resumen, ventas, medios, crm, redes, gestion
 
 st.set_page_config(
@@ -11,37 +12,41 @@ st.set_page_config(
 )
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-def check_password():
-    if st.session_state.get("autenticado"):
-        return True
-    st.markdown("""
-    <div style="max-width:380px;margin:80px auto;text-align:center">
-        <h2 style="color:#1F3864;margin-bottom:4px">Dashboard Comercial</h2>
-        <p style="color:#666;margin-bottom:28px">Ingresá tu contraseña para continuar</p>
-    </div>""", unsafe_allow_html=True)
-    _, col, _ = st.columns([1,2,1])
-    with col:
-        pwd = st.text_input("Contraseña", type="password", key="pwd_input")
-        if st.button("Ingresar", use_container_width=True, type="primary"):
-            if pwd == st.secrets.get("dashboard_password", "hiper2025"):
-                st.session_state["autenticado"] = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta")
-    return False
-
-if not check_password():
+if not login():
     st.stop()
 
-# ── Sidebar: selector de empresa ─────────────────────────────────────────────
+# ── Empresas permitidas para este usuario ─────────────────────────────────────
+empresas_permitidas = get_empresas_permitidas()
+
+# Filtrar solo las que existen en config
+empresas_disponibles = [e for e in empresas_permitidas if e in EMPRESAS]
+
+if not empresas_disponibles:
+    st.error("Tu usuario no tiene acceso a ninguna empresa. Contactá al administrador.")
+    st.stop()
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 🏢 Empresa")
-    empresa_sel = st.selectbox(
-        label="Seleccioná la empresa",
-        options=list(EMPRESAS.keys()),
-        key="empresa_sel",
-        label_visibility="collapsed",
-    )
+    # Saludo
+    st.markdown(f"👤 **{get_nombre()}**")
+    if es_admin():
+        st.caption("🔑 Administrador")
+    st.divider()
+
+    # Selector de empresa — solo si tiene acceso a más de una
+    if len(empresas_disponibles) > 1:
+        st.markdown("### 🏢 Empresa")
+        empresa_sel = st.selectbox(
+            label="Empresa",
+            options=empresas_disponibles,
+            key="empresa_sel",
+            label_visibility="collapsed",
+        )
+    else:
+        # Solo una empresa — la asigna directo sin mostrar selector
+        empresa_sel = empresas_disponibles[0]
+        cfg_unica = EMPRESAS[empresa_sel]
+        st.markdown(f"### {cfg_unica.get('icono','🏢')} {empresa_sel}")
 
     cfg_empresa = EMPRESAS[empresa_sel]
     colores     = get_colores(empresa_sel)
@@ -53,16 +58,17 @@ with st.sidebar:
         refrescar()
 
     st.divider()
+    if st.button("🚪 Cerrar sesión", use_container_width=True):
+        logout()
+
     st.markdown(
-        "<small style='color:#AAA'>Datos con caché de 5 min.<br>"
-        "Actualizá para ver cambios en el Sheet.</small>",
+        "<small style='color:#AAA'>Datos con caché de 5 min.</small>",
         unsafe_allow_html=True
     )
 
-# ── Header dinámico ───────────────────────────────────────────────────────────
+# ── Header ────────────────────────────────────────────────────────────────────
 icono = cfg_empresa.get("icono", "📊")
 color = colores["primario"]
-
 st.markdown(f"""
 <div style="display:flex;align-items:center;gap:12px;padding:8px 0 4px 0">
     <span style="font-size:28px">{icono}</span>
@@ -74,9 +80,8 @@ st.markdown(f"""
 <hr style="margin:6px 0 16px 0;border:none;border-top:2px solid {color}">
 """, unsafe_allow_html=True)
 
-# ── Carga de datos (cacheado por empresa vía sheet_id) ────────────────────────
+# ── Datos ─────────────────────────────────────────────────────────────────────
 sheet_id = cfg_empresa["sheet_id"]
-
 with st.spinner(f"Cargando datos de {empresa_sel}..."):
     datos = cargar_datos(sheet_id)
 
@@ -90,7 +95,6 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "⚙️ Gestión",
 ])
 
-# Todas las vistas reciben datos + colores de la empresa activa
 with tab1: resumen.render(datos, colores)
 with tab2: ventas.render(datos, colores, empresa_sel)
 with tab3: medios.render(datos, colores)

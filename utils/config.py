@@ -1,20 +1,20 @@
 EMPRESAS = {
     "Hiper Argentina": {
-        "sheet_id":      "1IG3h-hwSmUv9YTuX11PI4XqRjmXwQ4TtOCrWG634Cug",
+        "sheet_id":      "1dbiyQ3uox69Xd-3G3Z5apamM0Ut6S04g",
         "color_primario": "#C0392B",
         "icono":         "🏭",
         "lineas_venta":  ["zingueria", "perfileria"],
         "labels_venta":  ["Zinguería", "Perfilería"],
     },
     "Abasto": {
-        "sheet_id":      "1zwsH8Dsmlwhd9lbTWhlSO1FDKzjwT297K9MndCMd5Tw",
+        "sheet_id":      "SHEET_ID_ABASTO",
         "color_primario": "#1A6B3C",
         "icono":         "🏪",
         "lineas_venta":  [],
         "labels_venta":  [],
     },
     "G Tec": {
-        "sheet_id":      "1Ursnaw6l0dlC5fhKI4i5yRZE2ex1PrPwfrTE_pk_KFs",
+        "sheet_id":      "SHEET_ID_GTEC",
         "color_primario": "#1F4E8C",
         "icono":         "⚙️",
         "lineas_venta":  [],
