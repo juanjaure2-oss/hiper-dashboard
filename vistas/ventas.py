@@ -3,6 +3,12 @@ import plotly.graph_objects as go
 import pandas as pd
 from utils.formato import ars, num, periodo_label, variacion_pct
 
+def _num(val):
+    try:
+        return float(str(val).replace(',','.').replace('$','').strip())
+    except:
+        return 0.0
+
 def render(datos: dict, colores: dict):
     df_v = datos.get("ventas", pd.DataFrame())
     if df_v.empty:
@@ -12,6 +18,9 @@ def render(datos: dict, colores: dict):
     df_v = df_v.copy()
     df_v["fecha"] = pd.to_datetime(df_v["fecha"], errors="coerce")
     df_v = df_v.dropna(subset=["fecha"])
+    for col in ["zingueria","perfileria","total","cantidad"]:
+        if col in df_v.columns:
+            df_v[col] = df_v[col].apply(_num)
     df_v["periodo"] = df_v["fecha"].dt.to_period("M")
 
     periodos = sorted(df_v["periodo"].unique(), reverse=True)
@@ -22,11 +31,11 @@ def render(datos: dict, colores: dict):
     df_mes     = df_v[df_v["periodo"] == periodo_sel]
     df_mes_ant = df_v[df_v["periodo"] == (periodo_sel - 1)]
 
-    total_mes = df_mes["total"].sum()       if not df_mes.empty else 0
-    total_ant = df_mes_ant["total"].sum()   if not df_mes_ant.empty else 0
-    zing_mes  = df_mes["zingueria"].sum()   if not df_mes.empty else 0
-    perf_mes  = df_mes["perfileria"].sum()  if not df_mes.empty else 0
-    cant_mes  = df_mes["cantidad"].sum()    if not df_mes.empty else 0
+    total_mes = float(df_mes["total"].sum())    if not df_mes.empty else 0
+    total_ant = float(df_mes_ant["total"].sum())if not df_mes_ant.empty else 0
+    zing_mes  = float(df_mes["zingueria"].sum())if not df_mes.empty else 0
+    perf_mes  = float(df_mes["perfileria"].sum())if not df_mes.empty else 0
+    cant_mes  = float(df_mes["cantidad"].sum()) if not df_mes.empty else 0
 
     dv = variacion_pct(total_mes, total_ant)
     delta_str = f"{'▲' if dv and dv>=0 else '▼'} {abs(dv)*100:.1f}% vs mes anterior" if dv else ""
@@ -72,7 +81,7 @@ def render(datos: dict, colores: dict):
 
     with col_b:
         st.markdown("##### Mix del período")
-        if (zing_mes or 0) + (perf_mes or 0) > 0:
+        if zing_mes + perf_mes > 0:
             fig_pie = go.Figure(go.Pie(
                 labels=["Zinguería","Perfilería"],
                 values=[zing_mes, perf_mes],
@@ -88,7 +97,6 @@ def render(datos: dict, colores: dict):
         else:
             st.info("Sin datos de líneas para este período.")
 
-    # Top clientes
     if not df_mes.empty and "cliente" in df_mes.columns:
         st.markdown("##### Top clientes del período")
         top = (df_mes.groupby("cliente")["total"]
@@ -96,8 +104,7 @@ def render(datos: dict, colores: dict):
         top["total_fmt"] = top["total"].apply(ars)
         fig_h = go.Figure(go.Bar(
             x=top["total"], y=top["cliente"],
-            orientation="h",
-            marker_color=colores["primario"],
+            orientation="h", marker_color=colores["primario"],
             text=top["total_fmt"], textposition="outside",
             hovertemplate="<b>%{y}</b><br>$%{x:,.0f}<extra></extra>"
         ))
@@ -106,8 +113,7 @@ def render(datos: dict, colores: dict):
             margin=dict(l=0,r=90,t=10,b=0),
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             xaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
-            yaxis=dict(autorange="reversed"),
-            showlegend=False
+            yaxis=dict(autorange="reversed"), showlegend=False
         )
         st.plotly_chart(fig_h, use_container_width=True)
 

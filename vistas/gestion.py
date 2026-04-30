@@ -3,6 +3,12 @@ import plotly.graph_objects as go
 import pandas as pd
 from utils.formato import num, ars, periodo_label
 
+def _n(val):
+    try:
+        return float(str(val).replace(',','.').replace('$','').strip())
+    except:
+        return 0.0
+
 def render(datos: dict, colores: dict):
     df_piezas    = datos.get("piezas",    pd.DataFrame())
     df_reuniones = datos.get("reuniones", pd.DataFrame())
@@ -17,19 +23,19 @@ def render(datos: dict, colores: dict):
             st.info("Sin datos de piezas.")
         else:
             df_piezas = df_piezas.copy()
-            df_piezas["fecha"] = pd.to_datetime(df_piezas["fecha"], errors="coerce")
+            df_piezas["fecha"]    = pd.to_datetime(df_piezas["fecha"], errors="coerce")
+            df_piezas["cantidad"] = df_piezas["cantidad"].apply(_n)
             por_area = df_piezas.groupby("area")["cantidad"].sum().reset_index().sort_values("cantidad", ascending=False)
             fig = go.Figure(go.Bar(
                 x=por_area["cantidad"], y=por_area["area"],
                 orientation="h", marker_color=colores["secundario"],
-                text=por_area["cantidad"], textposition="outside",
+                text=por_area["cantidad"].apply(lambda x: str(int(x))), textposition="outside",
                 hovertemplate="<b>%{y}</b><br>%{x} piezas<extra></extra>"
             ))
             fig.update_layout(
                 height=220, margin=dict(l=0,r=40,t=10,b=0),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(gridcolor="#EEE"), yaxis=dict(autorange="reversed"),
-                showlegend=False
+                xaxis=dict(gridcolor="#EEE"), yaxis=dict(autorange="reversed"), showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
             st.caption(f"Total: {int(df_piezas['cantidad'].sum())} piezas")
@@ -61,15 +67,17 @@ def render(datos: dict, colores: dict):
         df_ppto = df_ppto.copy()
         df_ppto["fecha"] = pd.to_datetime(df_ppto["fecha"], errors="coerce")
         df_ppto = df_ppto.dropna(subset=["fecha"]).sort_values("fecha")
+        for col in ["asesor_mkt","analista_comercial","agencia","inversiones","total_otros_gastos"]:
+            if col in df_ppto.columns:
+                df_ppto[col] = df_ppto[col].apply(_n)
         df_ppto["label"] = df_ppto["fecha"].apply(periodo_label)
         fig_p = go.Figure()
-        capas = [
+        for col, nombre, color in [
             ("asesor_mkt",         "Asesor MKT",         colores["primario"]),
             ("analista_comercial", "Analista Comercial",  colores["secundario"]),
             ("agencia",            "Agencia",             "#8E44AD"),
             ("inversiones",        "Inversiones/Eventos", "#E67E22"),
-        ]
-        for col, nombre, color in capas:
+        ]:
             if col in df_ppto.columns:
                 fig_p.add_trace(go.Bar(
                     x=df_ppto["label"], y=df_ppto[col],
@@ -77,8 +85,7 @@ def render(datos: dict, colores: dict):
                     hovertemplate=f"<b>%{{x}}</b><br>{nombre}: $%{{y:,.0f}}<extra></extra>"
                 ))
         fig_p.update_layout(
-            barmode="stack", height=300,
-            margin=dict(l=0,r=0,t=10,b=0),
+            barmode="stack", height=300, margin=dict(l=0,r=0,t=10,b=0),
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             yaxis=dict(tickformat="$,.0f", gridcolor="#EEE"),
             xaxis=dict(tickangle=-45),

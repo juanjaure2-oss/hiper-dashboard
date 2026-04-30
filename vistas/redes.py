@@ -3,11 +3,13 @@ import plotly.graph_objects as go
 import pandas as pd
 from utils.formato import num, periodo_label
 
-CANAL_COLORES = {
-    "facebook":  "#1877F2",
-    "instagram": "#E1306C",
-    "linkedin":  "#0A66C2",
-}
+CANAL_COLORES = {"facebook":"#1877F2","instagram":"#E1306C","linkedin":"#0A66C2"}
+
+def _n(val):
+    try:
+        return float(str(val).replace(',','.').strip())
+    except:
+        return 0.0
 
 def render(datos: dict, colores: dict):
     df_r = datos.get("redes", pd.DataFrame())
@@ -18,7 +20,10 @@ def render(datos: dict, colores: dict):
     df_r = df_r.copy()
     df_r["fecha"] = pd.to_datetime(df_r["fecha"], errors="coerce")
     df_r = df_r.dropna(subset=["fecha"])
-    df_r["canal"]   = df_r["canal"].str.lower().str.strip()
+    df_r["canal"] = df_r["canal"].astype(str).str.lower().str.strip()
+    for col in ["seguidores_totales","adquiridos","impresiones","interacciones","cantidad_contenido"]:
+        if col in df_r.columns:
+            df_r[col] = df_r[col].apply(_n)
     df_r["periodo"] = df_r["fecha"].dt.to_period("M")
 
     periodos = sorted(df_r["periodo"].unique(), reverse=True)
@@ -61,10 +66,11 @@ def render(datos: dict, colores: dict):
         for canal in canales:
             d = df_r[df_r["canal"] == canal].sort_values("periodo")
             if d.empty or metrica not in d.columns: continue
+            d = d.copy()
             d["label"] = d["periodo"].apply(lambda p: periodo_label(p.to_timestamp()))
             fig.add_trace(go.Scatter(
-                x=d["label"], y=d[metrica],
-                name=canal.capitalize(), mode="lines+markers",
+                x=d["label"], y=d[metrica], name=canal.capitalize(),
+                mode="lines+markers",
                 line=dict(color=CANAL_COLORES.get(canal,"#999"), width=2),
                 marker=dict(size=6),
                 hovertemplate=f"<b>%{{x}}</b><br>{canal.capitalize()}: %{{y:,.0f}}<extra></extra>"
@@ -90,14 +96,12 @@ def render(datos: dict, colores: dict):
         d = df_cont[df_cont["canal"] == canal].sort_values("periodo")
         if d.empty: continue
         fig_c.add_trace(go.Bar(
-            x=d["label"], y=d["cantidad_contenido"],
-            name=canal.capitalize(),
+            x=d["label"], y=d["cantidad_contenido"], name=canal.capitalize(),
             marker_color=CANAL_COLORES.get(canal,"#999"),
             hovertemplate=f"<b>%{{x}}</b><br>{canal.capitalize()}: %{{y}} piezas<extra></extra>"
         ))
     fig_c.update_layout(
-        barmode="group", height=260,
-        margin=dict(l=0,r=0,t=10,b=0),
+        barmode="group", height=260, margin=dict(l=0,r=0,t=10,b=0),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         yaxis=dict(gridcolor="#EEE"), xaxis=dict(tickangle=-45),
         legend=dict(orientation="h", yanchor="bottom", y=1.02)
