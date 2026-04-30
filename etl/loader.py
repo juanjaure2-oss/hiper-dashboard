@@ -26,21 +26,19 @@ NUMERIC_COLS = {
 }
 
 def _parse_num(val):
-    """Convierte cualquier valor a float. Maneja formato ARS."""
+    """Convierte a float. Maneja $1.234.567,89 y 1234567.89"""
     if val is None or val == "":
         return np.nan
     if isinstance(val, (int, float)):
         return float(val) if not (isinstance(val, float) and np.isnan(val)) else np.nan
-    s = str(val).strip()
+    s = str(val).strip().replace("$", "").replace(" ", "")
     if s in ("", "-", "N/A", "n/a", "#N/A", "#VALUE!"):
         return np.nan
-    s = s.replace("$", "").replace(" ", "").replace("%", "")
+    # Argentine: 1.234.567,89
     if "," in s:
         s = s.replace(".", "").replace(",", ".")
-    else:
-        parts = s.split(".")
-        if len(parts) > 2:
-            s = s.replace(".", "")
+    elif s.count(".") > 1:
+        s = s.replace(".", "")
     try:
         return float(s)
     except:
@@ -48,33 +46,44 @@ def _parse_num(val):
 
 def _parse_date(val):
     """
-    Convierte fechas que pueden venir como:
-    - string "01/06/2025" o "2025-06-01"
-    - número serial de Excel/Sheets (ej: 46073)
-    - ya timestamp
+    Convierte fechas en cualquier formato:
+    - Serial numérico de Sheets (44927)
+    - 2025-06-01
+    - 01/06/2025
+    - 1/06/2025  ← formato G Tec (sin cero adelante)
+    - 1/6/2025
     """
     if val is None or val == "":
         return pd.NaT
-    # Si es número (serial de Sheets con UNFORMATTED_VALUE)
+
+    # Número serial de Google Sheets
     if isinstance(val, (int, float)):
-        if np.isnan(val) if isinstance(val, float) else False:
+        if isinstance(val, float) and np.isnan(val):
             return pd.NaT
-        # Sheets usa epoch 30/12/1899 (igual que Excel)
         try:
             return pd.Timestamp("1899-12-30") + pd.Timedelta(days=int(val))
         except:
             return pd.NaT
-    # Si es string
+
     s = str(val).strip()
     if s in ("", "N/A", "#N/A"):
         return pd.NaT
-    # Try multiple formats
-    for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d"]:
+
+    # Probamos todos los formatos posibles
+    formatos = [
+        "%Y-%m-%d",    # 2025-06-01
+        "%d/%m/%Y",    # 01/06/2025
+        "%m/%d/%Y",    # 06/01/2025
+        "%d-%m-%Y",    # 01-06-2025
+        "%Y/%m/%d",    # 2025/06/01
+    ]
+    for fmt in formatos:
         try:
             return pd.to_datetime(s, format=fmt)
         except:
             continue
-    # Fallback
+
+    # Fallback con dayfirst=True — maneja 1/06/2025 y 1/6/2025
     try:
         return pd.to_datetime(s, dayfirst=True, errors="coerce")
     except:
@@ -99,12 +108,12 @@ def _leer_hoja(client, sheet_id: str, key: str, nombre_hoja: str, date_cols: lis
 
             df.columns = [c.strip() for c in df.columns]
 
-            # Convert date columns
+            # Convertir fechas
             for col in date_cols:
                 if col in df.columns:
                     df[col] = df[col].apply(_parse_date)
 
-            # Convert numeric columns
+            # Convertir numéricos conocidos
             for col in NUMERIC_COLS.get(key, []):
                 if col in df.columns:
                     df[col] = df[col].apply(_parse_num)
