@@ -92,7 +92,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 
 # Todas las vistas reciben datos + colores de la empresa activa
 with tab1: resumen.render(datos, colores)
-with tab2: ventas.render(datos, colores)
+with tab2: ventas.render(datos, colores, empresa_sel)
 with tab3: medios.render(datos, colores)
 with tab4: crm.render(datos, colores)
 with tab5: redes.render(datos, colores)

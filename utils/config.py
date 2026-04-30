@@ -1,26 +1,27 @@
-# ─── EMPRESAS ────────────────────────────────────────────────────────────────
-# Para agregar una empresa nueva: sumar una entrada a este dict con su Sheet ID.
-# No hay que tocar ningún otro archivo.
-
 EMPRESAS = {
     "Hiper Argentina": {
-        "sheet_id": "1IG3h-hwSmUv9YTuX11PI4XqRjmXwQ4TtOCrWG634Cug",
+        "sheet_id":      "1dbiyQ3uox69Xd-3G3Z5apamM0Ut6S04g",
         "color_primario": "#C0392B",
-        "icono": "🏭",
+        "icono":         "🏭",
+        "lineas_venta":  ["zingueria", "perfileria"],
+        "labels_venta":  ["Zinguería", "Perfilería"],
     },
     "Abasto": {
-        "sheet_id": "1zwsH8Dsmlwhd9lbTWhlSO1FDKzjwT297K9MndCMd5Tw",   # reemplazar cuando esté disponible
+        "sheet_id":      "SHEET_ID_ABASTO",
         "color_primario": "#1A6B3C",
-        "icono": "🏪",
+        "icono":         "🏪",
+        "lineas_venta":  [],
+        "labels_venta":  [],
     },
     "G Tec": {
-        "sheet_id": "1Ursnaw6l0dlC5fhKI4i5yRZE2ex1PrPwfrTE_pk_KFs",     # reemplazar cuando esté disponible
+        "sheet_id":      "SHEET_ID_GTEC",
         "color_primario": "#1F4E8C",
-        "icono": "⚙️",
+        "icono":         "⚙️",
+        "lineas_venta":  [],
+        "labels_venta":  [],
     },
 }
 
-# ─── HOJAS (iguales para todas las empresas) ─────────────────────────────────
 HOJAS = {
     "kpi":        "kpi_historico",
     "ventas":     "ventas",
@@ -34,7 +35,6 @@ HOJAS = {
     "tareas":     "proyectos_tareas",
 }
 
-# ─── COLUMNAS DE FECHA por hoja ───────────────────────────────────────────────
 DATE_COLS = {
     "kpi":         ["fecha"],
     "ventas":      ["fecha"],
@@ -48,21 +48,20 @@ DATE_COLS = {
     "tareas":      ["fecha_inicio", "fecha_vencimiento"],
 }
 
-# ─── COLORES BASE (se sobreescriben por empresa) ──────────────────────────────
 COLORES_BASE = {
-    "secundario":  "#1F3864",
-    "acento":      "#E8F5E9",
-    "google":      "#4285F4",
-    "meta":        "#1877F2",
-    "positivo":    "#27AE60",
-    "negativo":    "#E74C3C",
-    "neutro":      "#7F8C8D",
+    "secundario": "#1F3864",
+    "acento":     "#E8F5E9",
+    "google":     "#4285F4",
+    "meta":       "#1877F2",
+    "positivo":   "#27AE60",
+    "negativo":   "#E74C3C",
+    "neutro":     "#7F8C8D",
 }
 
 def get_colores(empresa: str) -> dict:
-    """Retorna el dict de colores completo para una empresa."""
     cfg = EMPRESAS.get(empresa, {})
-    return {
-        **COLORES_BASE,
-        "primario": cfg.get("color_primario", "#C0392B"),
-    }
+    return {**COLORES_BASE, "primario": cfg.get("color_primario", "#C0392B")}
+
+def get_lineas_venta(empresa: str):
+    cfg = EMPRESAS.get(empresa, {})
+    return cfg.get("lineas_venta", []), cfg.get("labels_venta", [])
