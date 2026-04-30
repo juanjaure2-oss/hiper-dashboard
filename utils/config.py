@@ -9,12 +9,12 @@ EMPRESAS = {
         "icono": "🏭",
     },
     "Abasto": {
-        "sheet_id": "SHEET_ID_ABASTO",   # reemplazar cuando esté disponible
+        "sheet_id": "1zwsH8Dsmlwhd9lbTWhlSO1FDKzjwT297K9MndCMd5Tw",   # reemplazar cuando esté disponible
         "color_primario": "#1A6B3C",
         "icono": "🏪",
     },
     "G Tec": {
-        "sheet_id": "SHEET_ID_GTEC",     # reemplazar cuando esté disponible
+        "sheet_id": "1Ursnaw6l0dlC5fhKI4i5yRZE2ex1PrPwfrTE_pk_KFs",     # reemplazar cuando esté disponible
         "color_primario": "#1F4E8C",
         "icono": "⚙️",
     },
